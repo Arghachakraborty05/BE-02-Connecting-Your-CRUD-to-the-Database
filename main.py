@@ -47,17 +47,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Task API", version="2.0", lifespan=lifespan)
 
-tasks = [
-    {"id": 1, "title": "Learn FastAPI", "done": False},
-    {"id": 2, "title": "Build CRUD API", "done": False},
-    {"id": 3, "title": "Test the API", "done": False},
-]
-
 @app.get("/", description="Get API information and available endpoints.")
 def root():
     return {
         "name": "Task API",
-        "version": "1.0",
+        "version": "2.0",
         "endpoints": ["/tasks"]
     }
 
@@ -68,19 +62,29 @@ def health():
 
 @app.get("/tasks", description="Get all tasks.")
 def get_tasks():
-    return tasks
+    """Stage 1: Read all tasks from SQLite database."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tasks")
+    tasks = cursor.fetchall()
+    conn.close()
+    return [dict(task) for task in tasks]
 
 @app.get("/tasks/{task_id}", description="Get a single task by ID.")
 def get_task(task_id: int):
-    task = next((task for task in tasks if task["id"] == task_id), None)
+    """Stage 1: Read a single task by ID from SQLite database."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+    task = cursor.fetchone()
+    conn.close()
 
     if task is None:
         return JSONResponse(
-            status_code=404,
-            content={"error": f"Task {task_id} not found"}
+            status_code=404, content={"error": f"Task {task_id} not found"}
         )
 
-    return task
+    return dict(task)
 
 @app.post("/tasks", status_code=201, description="Create a new task.")
 def create_task(task_data: dict):
