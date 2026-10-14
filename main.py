@@ -88,6 +88,7 @@ def get_task(task_id: int):
 
 @app.post("/tasks", status_code=201, description="Create a new task.")
 def create_task(task_data: dict):
+    """Stage 2: Create a new task in the SQLite database with validation."""
     title = task_data.get("title")
 
     if not isinstance(title, str) or not title.strip():
@@ -96,17 +97,23 @@ def create_task(task_data: dict):
             content={"error": "Title is required"}
         )
 
-    new_id = max(task["id"] for task in tasks) + 1
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
-    new_task = {
-        "id": new_id,
-        "title": title.strip(),
-        "done": False
-    }
+    # Insert task into SQLite database (done defaults to 0 / False)
+    cursor.execute(
+        "INSERT INTO tasks (title, done) VALUES (?, ?)", (title.strip(), 0)
+    )
+    conn.commit()
 
-    tasks.append(new_task)
+    new_id = cursor.lastrowid
 
-    return new_task
+    # Fetch the newly created record to return it
+    cursor.execute("SELECT * FROM tasks WHERE id = ?", (new_id,))
+    new_task = cursor.fetchone()
+    conn.close()
+
+    return dict(new_task)
 
 @app.put("/tasks/{task_id}", description="Update a task by ID.")
 def update_task(task_id: int, task_data: dict):
